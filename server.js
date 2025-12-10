@@ -8,6 +8,8 @@ const PORT = process.env.PORT || 3000;
 // CORSを有効化
 app.use(cors());
 app.use(express.json());
+// URLエンコードされたボディをパース
+app.use(express.urlencoded({ extended: true }));
 
 // ヘルスチェックエンドポイント
 app.get('/', (req, res) => {
@@ -23,15 +25,21 @@ app.get('/', (req, res) => {
 // メインのテキスト生成エンドポイント
 app.get('/generate', (req, res) => {
   try {
-    // パラメータの取得とバリデーション
-    const char = req.query.char || 'あ';
+    // パラメータの取得（デコードされたものを使用）
+    let char = req.query.char || 'あ';
     const resolution = Math.min(Math.max(parseInt(req.query.resolution) || 128, 32), 512);
     const threshold = Math.min(Math.max(parseInt(req.query.threshold) || 120, 0), 255);
+    
+    // デバッグ: 受け取った文字を出力
+    console.log('Raw char parameter:', char);
+    console.log('Char length:', char.length);
+    console.log('Char codes:', Array.from(char).map(c => c.charCodeAt(0)));
     
     // 1文字のみに制限
     const singleChar = char.charAt(0) || 'あ';
     
-    console.log(`Generating text for: "${singleChar}", resolution: ${resolution}, threshold: ${threshold}`);
+    console.log(`Generating text for: "${singleChar}" (U+${singleChar.charCodeAt(0).toString(16).toUpperCase()})`);
+    console.log(`Resolution: ${resolution}, Threshold: ${threshold}`);
     
     // Canvasの作成
     const canvasSize = 256;
@@ -42,7 +50,7 @@ app.get('/generate', (req, res) => {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
     
-    // 文字を描画（フォント指定を簡潔に）
+    // 文字を描画
     const fontSize = resolution * 0.9;
     ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = '#000000';
@@ -109,6 +117,7 @@ app.get('/generate', (req, res) => {
     const result = {
       success: true,
       char: singleChar,
+      charCode: singleChar.charCodeAt(0),
       resolution: resolution,
       threshold: threshold,
       canvasWidth: canvasSize,
@@ -128,6 +137,7 @@ app.get('/generate', (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+      stack: error.stack,
       timestamp: new Date().toISOString()
     });
   }
@@ -142,7 +152,8 @@ app.post('/generate', (req, res) => {
     const res_value = Math.min(Math.max(parseInt(resolution) || 128, 32), 512);
     const thresh_value = Math.min(Math.max(parseInt(threshold) || 120, 0), 255);
     
-    console.log(`POST: Generating text for: "${singleChar}", resolution: ${res_value}, threshold: ${thresh_value}`);
+    console.log(`POST: Generating text for: "${singleChar}" (U+${singleChar.charCodeAt(0).toString(16).toUpperCase()})`);
+    console.log(`Resolution: ${res_value}, Threshold: ${thresh_value}`);
     
     const canvasSize = 256;
     const canvas = createCanvas(canvasSize, canvasSize);
@@ -208,6 +219,7 @@ app.post('/generate', (req, res) => {
     const result = {
       success: true,
       char: singleChar,
+      charCode: singleChar.charCodeAt(0),
       resolution: res_value,
       threshold: thresh_value,
       canvasWidth: canvasSize,
@@ -227,6 +239,7 @@ app.post('/generate', (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+      stack: error.stack,
       timestamp: new Date().toISOString()
     });
   }
