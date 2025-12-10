@@ -1,33 +1,31 @@
-FROM node:18-alpine
+# ベースイメージには軽量かつCanvasのビルドが安定しているDebianベース(slim)を使用
+FROM node:20-slim
 
-# Canvasのビルドに必要な依存関係と日本語フォントをインストール
-RUN apk add --no-cache \
-    build-base \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    giflib-dev \
-    pixman-dev \
-    fontconfig \
-    font-noto-cjk-extra
+# 1. システム依存関係と日本語フォントのインストール
+# canvasに必要なライブラリ + 日本語フォント(fonts-noto-cjk)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
 
-# フォントキャッシュを更新
-RUN fc-cache -fv
-
-# 作業ディレクトリを設定
+# 2. 作業ディレクトリの設定
 WORKDIR /app
 
-# package.jsonをコピー
-COPY package.json ./
-
-# 依存関係をインストール
+# 3. 依存パッケージのインストール
+COPY package*.json ./
+# 開発用依存を除外してインストール
 RUN npm install --production
 
-# アプリケーションのソースをコピー
-COPY . .
+# 4. アプリケーションコードのコピー
+COPY server.js ./
 
-# ポートを公開
+# 5. ポートの公開 (server.jsのデフォルト)
 EXPOSE 3000
 
-# アプリケーションを起動
-CMD ["node", "server.js"]
+# 6. サーバー起動
+CMD ["npm", "start"]
