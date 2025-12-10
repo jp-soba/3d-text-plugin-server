@@ -84,31 +84,68 @@ function traceBoundary(startX, startY, w, h, grid, visited) {
 function simplifyContour(points, epsilon) {
   if (points.length <= 2) return points;
 
-  let dmax = 0;
-  let index = 0;
-  const end = points.length - 1;
+  const len = points.length;
+  
+  // どの点を残すか管理するフラグ配列（メモリ効率良）
+  // TypedArrayを使うとさらに軽量
+  const keep = new Uint8Array(len);
+  keep[0] = 1;
+  keep[len - 1] = 1;
 
-  for (let i = 1; i < end; i++) {
-    const d = pointLineDistance(points[i], points[0], points[end]);
-    if (d > dmax) {
-      index = i;
-      dmax = d;
+  const stack = [0, len - 1];
+
+  while (stack.length > 0) {
+    const endIndex = stack.pop();
+    const startIndex = stack.pop();
+
+    let dmax = 0;
+    let index = startIndex;
+    
+    // 始点と終点を結ぶ線
+    const a = points[startIndex];
+    const b = points[endIndex];
+    
+    // 事前計算（割り算をループ内で減らす）
+    let A = b.y - a.y;
+    let B = a.x - b.x;
+    let C = b.x * a.y - b.y * a.x;
+    const distDenom = Math.sqrt(A*A + B*B);
+
+    // 距離計算の最適化
+    if (distDenom > 0.000001) {
+       for (let i = startIndex + 1; i < endIndex; i++) {
+         const p = points[i];
+         const d = Math.abs(A * p.x + B * p.y + C) / distDenom;
+         if (d > dmax) {
+           index = i;
+           dmax = d;
+         }
+       }
+    } else {
+        // 始点と終点がほぼ同じ場合
+        for (let i = startIndex + 1; i < endIndex; i++) {
+             const d = Math.sqrt(Math.pow(points[i].x - a.x, 2) + Math.pow(points[i].y - a.y, 2));
+             if (d > dmax) {
+                index = i;
+                dmax = d;
+             }
+        }
+    }
+
+    if (dmax > epsilon) {
+      keep[index] = 1;
+      // 分割してスタックに積む
+      stack.push(startIndex, index);
+      stack.push(index, endIndex);
     }
   }
 
-  if (dmax > epsilon) {
-    const recResults1 = simplifyContour(points.slice(0, index + 1), epsilon);
-    const recResults2 = simplifyContour(points.slice(index), epsilon);
-    return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
-  } else {
-    return [points[0], points[end]];
+  // フラグが立っている点だけを集めて新しい配列を作る
+  const result = [];
+  for (let i = 0; i < len; i++) {
+    if (keep[i]) result.push(points[i]);
   }
-}
-
-function pointLineDistance(p, a, b) {
-  let num = Math.abs((b.y - a.y) * p.x - (b.x - a.x) * p.y + b.x * a.y - b.y * a.x);
-  let den = Math.sqrt(Math.pow(b.y - a.y, 2) + Math.pow(b.x - a.x, 2));
-  return num / den;
+  return result;
 }
 
 // 3. 穴（Holes）の判定
