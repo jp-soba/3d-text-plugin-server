@@ -80,89 +80,95 @@ function generateTextBars(singleChar, resolution, threshold) {
   const canvas = createCanvas(canvasSize, canvasSize);
   const ctx = canvas.getContext('2d');
   
-  // 背景を白で塗りつぶす
+  // 背景白、文字黒で描画
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvasSize, canvasSize);
   
-  // 文字を描画
   const fontSize = resolution * 0.9;
-  ctx.font = `${fontSize}px sans-serif`;
+  ctx.font = `bold ${fontSize}px sans-serif`; // 太字の方が3Dで見栄えが良い
   ctx.fillStyle = '#000000';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(singleChar, canvasSize / 2, canvasSize / 2);
   
-  // 画像データを取得
   const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
   const data = imageData.data;
   
-  // 棒のデータを収集
-  const bars = [];
+  // 1. ピクセルのON/OFFを2次元配列化（処理しやすくするため）
+  const grid = new Array(canvasSize).fill(0).map(() => new Array(canvasSize).fill(false));
   let pixelOnCount = 0;
-  
+
   for (let y = 0; y < canvasSize; y++) {
-    let runStart = -1;
-    
     for (let x = 0; x < canvasSize; x++) {
       const index = (y * canvasSize + x) * 4;
-      const r = data[index];
-      const g = data[index + 1];
-      const b = data[index + 2];
-      
-      // 明るさを計算
-      const brightness = (r + g + b) / 3;
-      
-      // 背景が白なので、暗いピクセルを検出
-      const isOn = brightness < threshold;
-      
-      if (isOn) {
+      const brightness = (data[index] + data[index + 1] + data[index + 2]) / 3;
+      if (brightness < threshold) {
+        grid[y][x] = true;
         pixelOnCount++;
       }
-      
-      if (isOn && runStart === -1) {
-        // 連続区間の開始
-        runStart = x;
-      } else if (!isOn && runStart !== -1) {
-        // 連続区間の終了
-        const runEnd = x - 1;
-        bars.push({
-          x: runStart,
-          y: y,
-          width: runEnd - runStart + 1,
-          height: 1
-        });
-        runStart = -1;
-      }
     }
-    
-    // 行の最後まで連続していた場合
-    if (runStart !== -1) {
-      const runEnd = canvasSize - 1;
-      bars.push({
-        x: runStart,
-        y: y,
-        width: runEnd - runStart + 1,
-        height: 1
-      });
+  }
+
+  // 2. Greedy Meshing (大きな長方形として切り出す)
+  const bars = [];
+  
+  for (let y = 0; y < canvasSize; y++) {
+    for (let x = 0; x < canvasSize; x++) {
+      if (grid[y][x]) {
+        // 開始点を見つけた
+        
+        // A. 横幅(width)を決定
+        let width = 0;
+        while (x + width < canvasSize && grid[y][x + width]) {
+          width++;
+        }
+        
+        // B. 高さ(height)を決定
+        // この width の幅が、下の行でも全く同じように続いているか確認
+        let height = 1;
+        while (y + height < canvasSize) {
+          let nextRowMatch = true;
+          for (let k = 0; k < width; k++) {
+            if (!grid[y + height][x + k]) {
+              nextRowMatch = false;
+              break;
+            }
+          }
+          if (!nextRowMatch) break;
+          height++;
+        }
+        
+        // C. 長方形を記録
+        bars.push({
+          x: x,
+          y: y,
+          width: width,
+          height: height
+        });
+        
+        // D. 記録した部分をグリッドから削除（使用済みにする）
+        for (let dy = 0; dy < height; dy++) {
+          for (let dx = 0; dx < width; dx++) {
+            grid[y + dy][x + dx] = false;
+          }
+        }
+      }
     }
   }
   
-  // 結果を返す
   const result = {
     success: true,
     char: singleChar,
-    charCode: singleChar.charCodeAt(0),
     resolution: resolution,
     threshold: threshold,
     canvasWidth: canvasSize,
     canvasHeight: canvasSize,
-    bars: bars,
+    bars: bars,     // これで {x, y, width, height} が返る（height > 1 になりうる）
     barCount: bars.length,
-    pixelOnCount: pixelOnCount,
-    timestamp: new Date().toISOString()
+    pixelOnCount: pixelOnCount
   };
   
-  console.log(`Generated ${bars.length} bars for "${singleChar}" (${pixelOnCount} pixels detected)`);
+  console.log(`Generated ${bars.length} blocks for "${singleChar}" (Greedy Mesh)`);
   
   return result;
 }
