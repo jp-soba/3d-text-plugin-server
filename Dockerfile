@@ -27,5 +27,8 @@ COPY server.js ./
 # 5. ポートの公開 (server.jsのデフォルト)
 EXPOSE 3000
 
+# Node.jsのヒープサイズを4GBに
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # 6. サーバー起動
 CMD ["npm", "start"]
