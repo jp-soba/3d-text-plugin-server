@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { createCanvas, registerFont } = require('canvas');
+const { createCanvas } = require('canvas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,42 +15,9 @@ app.get('/', (req, res) => {
     status: 'ok',
     message: 'Roblox 3D Text API',
     endpoints: {
-      generate: '/generate?char=あ&resolution=128&threshold=120',
-      debug: '/debug?char=あ'
+      generate: '/generate?char=あ&resolution=128&threshold=120'
     }
   });
-});
-
-// デバッグ用エンドポイント（画像を返す）
-app.get('/debug', (req, res) => {
-  try {
-    const char = (req.query.char || 'あ').charAt(0);
-    const resolution = Math.min(Math.max(parseInt(req.query.resolution) || 128, 32), 512);
-    
-    const canvasSize = 256;
-    const canvas = createCanvas(canvasSize, canvasSize);
-    const ctx = canvas.getContext('2d');
-    
-    // 背景を白で塗りつぶす
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize, canvasSize);
-    
-    // 文字を描画
-    const fontSize = resolution * 0.9;
-    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", sans-serif`;
-    ctx.fillStyle = '#000000';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(char, canvasSize / 2, canvasSize / 2);
-    
-    // PNGとして返す
-    res.setHeader('Content-Type', 'image/png');
-    canvas.createPNGStream().pipe(res);
-    
-  } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
-  }
 });
 
 // メインのテキスト生成エンドポイント
@@ -71,14 +38,13 @@ app.get('/generate', (req, res) => {
     const canvas = createCanvas(canvasSize, canvasSize);
     const ctx = canvas.getContext('2d');
     
-    // 背景を白で塗りつぶす（明るさ判定のため）
+    // 背景を白で塗りつぶす
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
     
-    // 文字を描画
+    // 文字を描画（フォント指定を簡潔に）
     const fontSize = resolution * 0.9;
-    // フォント指定を明確に
-    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", "DejaVu Sans", sans-serif`;
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -90,7 +56,7 @@ app.get('/generate', (req, res) => {
     
     // 棒のデータを収集
     const bars = [];
-    let pixelOnCount = 0; // デバッグ用
+    let pixelOnCount = 0;
     
     for (let y = 0; y < canvasSize; y++) {
       let runStart = -1;
@@ -100,13 +66,11 @@ app.get('/generate', (req, res) => {
         const r = data[index];
         const g = data[index + 1];
         const b = data[index + 2];
-        const a = data[index + 3];
         
-        // 明るさを計算（白=255, 黒=0）
+        // 明るさを計算
         const brightness = (r + g + b) / 3;
         
-        // 背景が白なので、暗いピクセル（黒文字）を検出
-        // brightness が threshold より小さければ「文字部分」
+        // 背景が白なので、暗いピクセルを検出
         const isOn = brightness < threshold;
         
         if (isOn) {
@@ -151,7 +115,7 @@ app.get('/generate', (req, res) => {
       canvasHeight: canvasSize,
       bars: bars,
       barCount: bars.length,
-      pixelOnCount: pixelOnCount, // デバッグ情報
+      pixelOnCount: pixelOnCount,
       timestamp: new Date().toISOString()
     };
     
@@ -188,7 +152,7 @@ app.post('/generate', (req, res) => {
     ctx.fillRect(0, 0, canvasSize, canvasSize);
     
     const fontSize = res_value * 0.9;
-    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", "DejaVu Sans", sans-serif`;
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -282,5 +246,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`Try: http://localhost:${PORT}/generate?char=あ&resolution=128&threshold=120`);
-  console.log(`Debug image: http://localhost:${PORT}/debug?char=あ`);
 });

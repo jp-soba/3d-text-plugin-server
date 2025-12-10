@@ -9,8 +9,10 @@ RUN apk add --no-cache \
     giflib-dev \
     pixman-dev \
     fontconfig \
-    ttf-dejavu \
-    font-noto-cjk
+    font-noto-cjk-extra
+
+# フォントキャッシュを更新
+RUN fc-cache -fv
 
 # 作業ディレクトリを設定
 WORKDIR /app
