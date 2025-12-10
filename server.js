@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { createCanvas } = require('canvas');
+const { createCanvas, registerFont } = require('canvas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,9 +15,42 @@ app.get('/', (req, res) => {
     status: 'ok',
     message: 'Roblox 3D Text API',
     endpoints: {
-      generate: '/generate?char=あ&resolution=128&threshold=120'
+      generate: '/generate?char=あ&resolution=128&threshold=120',
+      debug: '/debug?char=あ'
     }
   });
+});
+
+// デバッグ用エンドポイント（画像を返す）
+app.get('/debug', (req, res) => {
+  try {
+    const char = (req.query.char || 'あ').charAt(0);
+    const resolution = Math.min(Math.max(parseInt(req.query.resolution) || 128, 32), 512);
+    
+    const canvasSize = 256;
+    const canvas = createCanvas(canvasSize, canvasSize);
+    const ctx = canvas.getContext('2d');
+    
+    // 背景を白で塗りつぶす
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    
+    // 文字を描画
+    const fontSize = resolution * 0.9;
+    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = '#000000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(char, canvasSize / 2, canvasSize / 2);
+    
+    // PNGとして返す
+    res.setHeader('Content-Type', 'image/png');
+    canvas.createPNGStream().pipe(res);
+    
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // メインのテキスト生成エンドポイント
@@ -38,13 +71,14 @@ app.get('/generate', (req, res) => {
     const canvas = createCanvas(canvasSize, canvasSize);
     const ctx = canvas.getContext('2d');
     
-    // 背景を薄いグレーで塗りつぶす
-    ctx.fillStyle = '#eeeeee';
+    // 背景を白で塗りつぶす（明るさ判定のため）
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
     
     // 文字を描画
     const fontSize = resolution * 0.9;
-    ctx.font = `${fontSize}px "Noto Sans JP", "Yu Gothic", "Hiragino Sans", "MS PGothic", sans-serif`;
+    // フォント指定を明確に
+    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", "DejaVu Sans", sans-serif`;
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -56,6 +90,7 @@ app.get('/generate', (req, res) => {
     
     // 棒のデータを収集
     const bars = [];
+    let pixelOnCount = 0; // デバッグ用
     
     for (let y = 0; y < canvasSize; y++) {
       let runStart = -1;
@@ -67,11 +102,16 @@ app.get('/generate', (req, res) => {
         const b = data[index + 2];
         const a = data[index + 3];
         
-        // 明るさを計算
+        // 明るさを計算（白=255, 黒=0）
         const brightness = (r + g + b) / 3;
         
-        // ピクセルが「オン」かどうかを判定
-        const isOn = a > 0 && brightness < threshold;
+        // 背景が白なので、暗いピクセル（黒文字）を検出
+        // brightness が threshold より小さければ「文字部分」
+        const isOn = brightness < threshold;
+        
+        if (isOn) {
+          pixelOnCount++;
+        }
         
         if (isOn && runStart === -1) {
           // 連続区間の開始
@@ -111,10 +151,11 @@ app.get('/generate', (req, res) => {
       canvasHeight: canvasSize,
       bars: bars,
       barCount: bars.length,
+      pixelOnCount: pixelOnCount, // デバッグ情報
       timestamp: new Date().toISOString()
     };
     
-    console.log(`Generated ${bars.length} bars for "${singleChar}"`);
+    console.log(`Generated ${bars.length} bars for "${singleChar}" (${pixelOnCount} pixels detected)`);
     
     res.json(result);
     
@@ -128,22 +169,11 @@ app.get('/generate', (req, res) => {
   }
 });
 
-// POSTエンドポイント（複数文字対応）
+// POSTエンドポイント
 app.post('/generate', (req, res) => {
   try {
     const { char, resolution, threshold } = req.body;
     
-    // クエリパラメータとして再処理
-    const params = new URLSearchParams({
-      char: char || 'あ',
-      resolution: resolution || 128,
-      threshold: threshold || 120
-    });
-    
-    // GETエンドポイントと同じ処理を実行
-    req.query = Object.fromEntries(params);
-    
-    // 上記のGETロジックを再利用
     const singleChar = (char || 'あ').charAt(0);
     const res_value = Math.min(Math.max(parseInt(resolution) || 128, 32), 512);
     const thresh_value = Math.min(Math.max(parseInt(threshold) || 120, 0), 255);
@@ -154,11 +184,11 @@ app.post('/generate', (req, res) => {
     const canvas = createCanvas(canvasSize, canvasSize);
     const ctx = canvas.getContext('2d');
     
-    ctx.fillStyle = '#eeeeee';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
     
     const fontSize = res_value * 0.9;
-    ctx.font = `${fontSize}px "Noto Sans JP", "Yu Gothic", "Hiragino Sans", "MS PGothic", sans-serif`;
+    ctx.font = `${fontSize}px "Noto Sans CJK JP", "Noto Sans JP", "DejaVu Sans", sans-serif`;
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -168,6 +198,7 @@ app.post('/generate', (req, res) => {
     const data = imageData.data;
     
     const bars = [];
+    let pixelOnCount = 0;
     
     for (let y = 0; y < canvasSize; y++) {
       let runStart = -1;
@@ -177,10 +208,13 @@ app.post('/generate', (req, res) => {
         const r = data[index];
         const g = data[index + 1];
         const b = data[index + 2];
-        const a = data[index + 3];
         
         const brightness = (r + g + b) / 3;
-        const isOn = a > 0 && brightness < thresh_value;
+        const isOn = brightness < thresh_value;
+        
+        if (isOn) {
+          pixelOnCount++;
+        }
         
         if (isOn && runStart === -1) {
           runStart = x;
@@ -216,10 +250,11 @@ app.post('/generate', (req, res) => {
       canvasHeight: canvasSize,
       bars: bars,
       barCount: bars.length,
+      pixelOnCount: pixelOnCount,
       timestamp: new Date().toISOString()
     };
     
-    console.log(`POST: Generated ${bars.length} bars for "${singleChar}"`);
+    console.log(`POST: Generated ${bars.length} bars for "${singleChar}" (${pixelOnCount} pixels detected)`);
     
     res.json(result);
     
@@ -247,4 +282,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`Try: http://localhost:${PORT}/generate?char=あ&resolution=128&threshold=120`);
+  console.log(`Debug image: http://localhost:${PORT}/debug?char=あ`);
 });
