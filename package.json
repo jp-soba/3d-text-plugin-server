@@ -1,0 +1,23 @@
+{
+  "name": "roblox-text-api",
+  "version": "1.0.0",
+  "description": "API for generating 3D text data for Roblox from Japanese characters",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "roblox",
+    "canvas",
+    "text",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
