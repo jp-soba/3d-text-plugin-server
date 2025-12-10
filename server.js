@@ -29,7 +29,7 @@ function findContours(width, height, data, threshold) {
       // 黒い画素で、かつ未訪問で、かつ境界（外周）である場合
       if (grid[idx] === 1 && visited[idx] === 0) {
         const contour = traceBoundary(x, y, width, height, grid, visited);
-        if (contour.length > 2) {
+        if (contour.length > 5) {
           contours.push(contour);
         }
       }
