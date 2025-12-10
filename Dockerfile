@@ -12,11 +12,11 @@ RUN apk add --no-cache \
 # 作業ディレクトリを設定
 WORKDIR /app
 
-# package.jsonとpackage-lock.jsonをコピー
-COPY package*.json ./
+# package.jsonをコピー
+COPY package.json ./
 
 # 依存関係をインストール
-RUN npm ci --only=production
+RUN npm install --production
 
 # アプリケーションのソースをコピー
 COPY . .
