@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { createCanvas } = require('canvas');
-const d3 = require('d3-contours'); // 信頼の幾何学ライブラリ
+const d3 = require('d3-contour'); // 信頼の幾何学ライブラリ
 const earcut = require('earcut');
 
 const app = express();
